@@ -1,6 +1,7 @@
 import platform
 import os
 import shutil
+import subprocess
 import sys
 
 from conan.tools.build import cmd_args_to_string
@@ -40,6 +41,22 @@ def _get_uv_verbosity():
         LEVEL_DEBUG: "--verbose",
         LEVEL_TRACE: "--verbose",
     }.get(ConanOutput.get_output_level(), "")
+
+
+def _get_uv_default_index(python_exe):
+    """Return default index URL for uv when only pip is configured."""
+    if os.environ.get("UV_DEFAULT_INDEX") or os.environ.get("UV_INDEX_URL"):
+        return None
+    index_url = os.environ.get("PIP_INDEX_URL")
+    if not index_url:
+        try:
+            result = subprocess.run([python_exe, "-m", "pip", "config", "get", "global.index-url"],
+                                    capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                index_url = result.stdout.strip()
+        except Exception:
+            pass
+    return index_url or None
 
 
 class PyEnv:
@@ -165,7 +182,11 @@ class PyEnv:
                 self._conanfile.run(cmd_args_to_string(pip_args))
                 uv_cmd = [python_exe, "-m", "uv"]
 
-            uv_venv_args = uv_cmd + ['venv', '--seed', '--python', py_version, self._env_dir]
+            uv_venv_args = uv_cmd + ['venv', '--seed', '--system-certs', '--python', py_version,
+                                     self._env_dir]
+            index_url = _get_uv_default_index(self._default_python)
+            if index_url:
+                uv_venv_args.extend(['--default-index', index_url, '--index-url', index_url])
             uv_verbosity = _get_uv_verbosity()
             if uv_verbosity:
                 uv_venv_args.append(uv_verbosity)

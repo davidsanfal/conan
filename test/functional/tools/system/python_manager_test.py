@@ -1,11 +1,29 @@
 import json
+import os
 import sys
 import textwrap
 import platform
 import pytest
 from conan.test.utils.tools import TestClient
+from conan.test.utils.env import environment_update
 from conan.internal.util.files import save_files
 from conan.test.utils.test_files import temp_folder
+
+
+def _uv_network_env():
+    env_vars = {"UV_SYSTEM_CERTS": "true"}
+    pip_index = os.environ.get("PIP_INDEX_URL")
+    if (pip_index and not os.environ.get("UV_DEFAULT_INDEX")
+            and not os.environ.get("UV_INDEX_URL")):
+        env_vars["UV_DEFAULT_INDEX"] = pip_index
+        env_vars["UV_INDEX_URL"] = pip_index
+    return env_vars
+
+
+@pytest.fixture
+def uv_network_env():
+    with environment_update(_uv_network_env()):
+        yield
 
 
 def _create_py_hello_world(folder):
@@ -175,7 +193,7 @@ def test_create_py_manager():
 
 
 @pytest.mark.skipif(sys.version_info.minor < 8, reason="UV needs Python >= 3.8")
-def test_build_uv_manager():
+def test_build_uv_manager(uv_network_env):
 
     pip_package_folder = temp_folder(path_with_spaces=True)
     _create_py_hello_world(pip_package_folder)
@@ -238,7 +256,7 @@ def test_build_uv_manager():
 
 
 @pytest.mark.skipif(sys.version_info.minor < 8, reason="UV needs Python >= 3.8")
-def test_fail_build_uv_manager():
+def test_fail_build_uv_manager(uv_network_env):
 
     pip_package_folder = temp_folder(path_with_spaces=True)
     _create_py_hello_world(pip_package_folder)
