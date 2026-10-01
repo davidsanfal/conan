@@ -54,6 +54,33 @@ def test_empty_pyenv():
     assert "conan_pyenv" in script
 
 
+def test_pyenv_detected_by_cmaketoolchain():
+    """ https://github.com/conan-io/conan/issues/20359 """
+    conanfile = textwrap.dedent("""
+        from conan import ConanFile
+        from conan.tools.system import PyEnv
+        from conan.tools.cmake import CMakeToolchain
+
+        class Pkg(ConanFile):
+            settings = "os", "arch", "compiler", "build_type"
+
+            def generate(self):
+                PyEnv(self).generate()
+                CMakeToolchain(self).generate()
+        """)
+    c = TestClient(path_with_spaces=False)
+    c.save({"conanfile.py": conanfile})
+    c.run("install .")
+
+    presets = json.loads(c.load("CMakePresets.json"))
+    cache_variables = presets["configurePresets"][0]["cacheVariables"]
+    bin_dir = "Scripts" if platform.system() == "Windows" else "bin"
+    python_exe = "python.exe" if platform.system() == "Windows" else "python"
+    env_dir = f"{c.current_folder}/conan_pyenv".replace("\\", "/")
+    assert cache_variables["Python_ROOT_DIR"] == env_dir
+    assert cache_variables["Python_EXECUTABLE"] == f"{env_dir}/{bin_dir}/{python_exe}"
+
+
 def test_build_py_manager():
     pip_package_folder = temp_folder(path_with_spaces=True)
     _create_py_hello_world(pip_package_folder)

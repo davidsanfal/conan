@@ -84,6 +84,8 @@ class PyEnv:
             else:
                 self._create_venv()
 
+        conanfile._conan_pyenvs = getattr(conanfile, "_conan_pyenvs", []) + [self]
+
     @property
     def env_dir(self):
         """Root directory of the virtual environment."""

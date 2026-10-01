@@ -202,6 +202,43 @@ class TestGenericBlocks:
         assert 'include("myowntoolchain.cmake")' in content
 
 
+class TestPyEnvCMakeVariables:
+    """https://github.com/conan-io/conan/issues/20359"""
+    def test_single_pyenv(self, conanfile):
+        pyenv = Mock(env_dir="/some/venv", env_exe="/some/venv/bin/python")
+        conanfile._conan_pyenvs = [pyenv]
+
+        toolchain = CMakeToolchain(conanfile)
+        toolchain._apply_pyenv_cmake_variables()
+        assert toolchain.cache_variables["Python_ROOT_DIR"] == "/some/venv"
+        assert toolchain.cache_variables["Python_EXECUTABLE"] == "/some/venv/bin/python"
+
+        # an explicit value always wins over the automatic one
+        toolchain2 = CMakeToolchain(conanfile)
+        toolchain2.cache_variables["Python_ROOT_DIR"] = "/explicit/path"
+        toolchain2._apply_pyenv_cmake_variables()
+        assert toolchain2.cache_variables["Python_ROOT_DIR"] == "/explicit/path"
+
+    def test_multiple_pyenvs_skipped_unless_selected_explicitly(self, conanfile):
+        pyenv1 = Mock(env_dir="/venv1", env_exe="/venv1/bin/python")
+        pyenv2 = Mock(env_dir="/venv2", env_exe="/venv2/bin/python")
+        conanfile._conan_pyenvs = [pyenv1, pyenv2]
+        toolchain = CMakeToolchain(conanfile)
+        toolchain._apply_pyenv_cmake_variables()
+        assert "Python_ROOT_DIR" not in toolchain.cache_variables
+
+        toolchain.cache_variables["Python_ROOT_DIR"] = pyenv2.env_dir
+        toolchain.cache_variables["Python_EXECUTABLE"] = pyenv2.env_exe
+        toolchain._apply_pyenv_cmake_variables()
+        assert toolchain.cache_variables["Python_ROOT_DIR"] == "/venv2"
+        assert toolchain.cache_variables["Python_EXECUTABLE"] == "/venv2/bin/python"
+
+    def test_no_pyenv_does_nothing(self, conanfile):
+        toolchain = CMakeToolchain(conanfile)
+        toolchain._apply_pyenv_cmake_variables()
+        assert "Python_ROOT_DIR" not in toolchain.cache_variables
+
+
 class TestBlocksFunctionality:
     def test_cmake_toolchain(self, conanfile):
         toolchain = CMakeToolchain(conanfile)

@@ -135,6 +135,22 @@ class CMakeToolchain:
         self.presets_run_environment = None
         self.absolute_paths = False  # By default use relative paths to toolchain and presets
 
+    def _apply_pyenv_cmake_variables(self):
+        # Duck-typed, no hard dependency on PyEnv. setdefault: explicit recipe values always win.
+        pyenvs = getattr(self._conanfile, "_conan_pyenvs", None)
+        if not pyenvs:
+            return
+        if len(pyenvs) > 1:
+            self._conanfile.output.info(
+                "CMakeToolchain: multiple PyEnv instances found, skipping automatic "
+                "Python_ROOT_DIR/Python_EXECUTABLE hints. Set them explicitly with "
+                "tc.cache_variables['Python_ROOT_DIR']/['Python_EXECUTABLE'] for the one "
+                "CMake should use.")
+            return
+        pyenv = pyenvs[0]
+        self.cache_variables.setdefault("Python_ROOT_DIR", pyenv.env_dir)
+        self.cache_variables.setdefault("Python_EXECUTABLE", pyenv.env_exe)
+
     def _context(self):
         """ Returns dict, the context for the template
         """
@@ -187,6 +203,8 @@ class CMakeToolchain:
         # Generators like Ninja or NMake requires an active vcvars
         elif self.generator is not None and "Visual" not in self.generator:
             VCVars(self._conanfile).generate()
+
+        self._apply_pyenv_cmake_variables()
 
         cache_variables = {}
         for name, value in self.cache_variables.items():

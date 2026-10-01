@@ -66,6 +66,25 @@ def test_pyenv_creation_error_message():
     assert "using '/python/interpreter/from/config': fake error message" in exc_info.value.args[0]
 
 
+def test_pyenv_registers_itself_on_conanfile():
+    """https://github.com/conan-io/conan/issues/20359"""
+    conanfile = ConanFileMock()
+    conanfile.settings = Settings()
+    conanfile.conf.define("tools.system.pyenv:python_interpreter",
+                          "/python/interpreter/from/config")
+
+    def fake_run(command, win_bash=False, subsystem=None, env=None, ignore_errors=False,  # noqa
+                 quiet=False):  # noqa
+        pass
+
+    conanfile.run = fake_run
+    pyenv1 = PyEnv(conanfile, "testenv1")
+    assert conanfile._conan_pyenvs == [pyenv1]
+
+    pyenv2 = PyEnv(conanfile, "testenv2")
+    assert conanfile._conan_pyenvs == [pyenv1, pyenv2]
+
+
 @pytest.mark.parametrize("level, expected_pip_flag", [
     (LEVEL_QUIET, "-qqq"),
     (LEVEL_ERROR, "-qq"),
